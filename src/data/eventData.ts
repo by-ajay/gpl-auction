@@ -1,4 +1,5 @@
 import { AuctionItem, HighlightCard, RuleStep, RegisteredTeam } from '../types';
+import registeredTeamsSeed from '../../data/registered_teams.json';
 
 export const ADMIN_EMAILS = [
   "its.rastro@gmail.com",
@@ -1536,4 +1537,4 @@ export const AUCTION_ITEMS: AuctionItem[] = RAW_AUCTION_ITEMS.map((item) => {
 });
 
 // Official registered teams enrolled for Green Premier League
-export const INITIAL_REGISTERED_TEAMS: RegisteredTeam[] = [];
+export const INITIAL_REGISTERED_TEAMS: RegisteredTeam[] = (registeredTeamsSeed as unknown as RegisteredTeam[]) || [];

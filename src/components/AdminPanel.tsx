@@ -19,6 +19,8 @@ import {
   Leaf,
   Trash2,
   RefreshCw,
+  Upload,
+  FileJson,
 } from 'lucide-react';
 import { calculateScaledItemPrice, getItemBudgetPercentage } from '../data/eventData';
 
@@ -36,6 +38,7 @@ interface AdminPanelProps {
   onDeleteTeam?: (teamId: string) => void;
   onResetAuction?: () => void;
   onRefreshTeams?: () => void;
+  onImportTeams?: (teams: RegisteredTeam[]) => void;
   isDarkMode: boolean;
 }
 
@@ -53,6 +56,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteTeam,
   onResetAuction,
   onRefreshTeams,
+  onImportTeams,
   isDarkMode,
 }) => {
   const [activeTab, setActiveTab] = useState<'teams' | 'auction' | 'budget' | 'resources'>('teams');
@@ -122,6 +126,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const exportTeamsToJSON = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(registeredTeams, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', 'registered_teams.json');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          if (onImportTeams) {
+            onImportTeams(parsed);
+          }
+          if (onRefreshTeams) {
+            setTimeout(onRefreshTeams, 200);
+          }
+        }
+      } catch (err) {
+        console.error('Invalid JSON file:', err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const soldCount = auctionItems.filter((i) => i.status === 'sold').length;
@@ -237,7 +275,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Total Teams Enrolled: <span className="text-emerald-400 font-bold text-sm">{registeredTeams.length}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -246,21 +284,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     setTimeout(() => setIsRefreshing(false), 500);
                   }}
                   disabled={isRefreshing}
-                  className="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 text-xs font-mono flex items-center gap-2 cursor-pointer transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 text-xs font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
-                  <span>{isRefreshing ? 'Syncing...' : 'Sync & Refresh Roster'}</span>
+                  <span>{isRefreshing ? 'Syncing...' : 'Sync Roster'}</span>
                 </button>
+
                 {registeredTeams.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={exportTeamsToCSV}
-                    className="px-3.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 text-xs font-mono flex items-center gap-2 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export CSV</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={exportTeamsToJSON}
+                      title="Download registered_teams.json to backup or commit to GitHub"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <FileJson className="w-3.5 h-3.5" />
+                      <span>Export JSON</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportTeamsToCSV}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>CSV</span>
+                    </button>
+                  </>
                 )}
+
+                <label
+                  title="Import registered teams from a JSON file"
+                  className="px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-xs font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import JSON</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportJSON}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
 

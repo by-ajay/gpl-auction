@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/teams/:id/status",
+      "destination": "/api/teams?action=status&id=:id"
+    },
+    {
+      "source": "/api/teams/:id",
+      "destination": "/api/teams?id=:id"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

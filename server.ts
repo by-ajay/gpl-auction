@@ -89,12 +89,34 @@ async function start() {
     res.json({ success: true, teams: inMemoryTeams });
   });
 
+  app.patch('/api/teams', (req, res) => {
+    const id = (req.query.id as string) || req.body?.id;
+    inMemoryTeams = loadTeams();
+    if (id) {
+      inMemoryTeams = inMemoryTeams.map((t) =>
+        t.id === id ? { ...t, status: t.status === 'approved' ? 'pending' : 'approved' } : t
+      );
+      saveTeams(inMemoryTeams);
+    }
+    res.json({ success: true, teams: inMemoryTeams });
+  });
+
   // API Route: Delete team
   app.delete('/api/teams/:id', (req, res) => {
     const { id } = req.params;
     inMemoryTeams = loadTeams();
     inMemoryTeams = inMemoryTeams.filter((t) => t.id !== id);
     saveTeams(inMemoryTeams);
+    res.json({ success: true, teams: inMemoryTeams });
+  });
+
+  app.delete('/api/teams', (req, res) => {
+    const id = (req.query.id as string) || req.body?.id;
+    inMemoryTeams = loadTeams();
+    if (id) {
+      inMemoryTeams = inMemoryTeams.filter((t) => t.id !== id);
+      saveTeams(inMemoryTeams);
+    }
     res.json({ success: true, teams: inMemoryTeams });
   });
 

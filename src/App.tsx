@@ -56,12 +56,14 @@ export default function App() {
       const saved = localStorage.getItem('suc_registered_teams');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = parsed.filter((t: RegisteredTeam) => t.id !== 'GPA-582910');
-          if (cleaned.length !== parsed.length) {
-            localStorage.setItem('suc_registered_teams', JSON.stringify(cleaned));
-          }
-          return cleaned;
+          // Merge with initial registered teams so seeded teams in repo are never missing
+          const map = new Map<string, RegisteredTeam>();
+          INITIAL_REGISTERED_TEAMS.forEach((t) => map.set(t.id, t));
+          cleaned.forEach((t: RegisteredTeam) => map.set(t.id, t));
+          const combined = Array.from(map.values());
+          return combined;
         }
       }
     } catch (e) {
@@ -75,17 +77,28 @@ export default function App() {
     try {
       const res = await fetch('/api/teams');
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setRegisteredTeams(data);
-          try {
-            localStorage.setItem('suc_registered_teams', JSON.stringify(data));
-          } catch {}
-          return data;
+        const contentType = res.headers.get('content-type');
+        // Ensure response is valid JSON and not an HTML SPA fallback
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setRegisteredTeams((prev) => {
+              const map = new Map<string, RegisteredTeam>();
+              INITIAL_REGISTERED_TEAMS.forEach((t) => map.set(t.id, t));
+              prev.forEach((t) => map.set(t.id, t));
+              data.forEach((t) => map.set(t.id, t));
+              const combined = Array.from(map.values());
+              try {
+                localStorage.setItem('suc_registered_teams', JSON.stringify(combined));
+              } catch {}
+              return combined;
+            });
+            return data;
+          }
         }
       }
     } catch {
-      // Offline or dev server starting up
+      // Offline or static hosting
     }
     return null;
   };
@@ -98,7 +111,13 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          setRegisteredTeams(parsed);
+          setRegisteredTeams((prev) => {
+            const map = new Map<string, RegisteredTeam>();
+            INITIAL_REGISTERED_TEAMS.forEach((t) => map.set(t.id, t));
+            prev.forEach((t) => map.set(t.id, t));
+            parsed.forEach((t: RegisteredTeam) => map.set(t.id, t));
+            return Array.from(map.values());
+          });
         }
       }
     } catch (e) {
@@ -726,6 +745,30 @@ export default function App() {
     } catch {}
   };
 
+  // Admin action: batch import teams from JSON
+  const handleImportTeams = (importedTeams: RegisteredTeam[]) => {
+    setRegisteredTeams((prev) => {
+      const map = new Map<string, RegisteredTeam>();
+      INITIAL_REGISTERED_TEAMS.forEach((t) => map.set(t.id, t));
+      prev.forEach((t) => map.set(t.id, t));
+      importedTeams.forEach((t) => map.set(t.id, t));
+      const merged = Array.from(map.values());
+      try {
+        localStorage.setItem('suc_registered_teams', JSON.stringify(merged));
+      } catch {}
+      return merged;
+    });
+
+    // Also attempt sending imported teams to serverless API
+    importedTeams.forEach((t) => {
+      fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(t),
+      }).catch(() => {});
+    });
+  };
+
   const totalDraftedCost = draftedItemIds.reduce((sum, id) => {
     const item = auctionItems.find((i) => i.id === id);
     return sum + (item ? item.startingPrice : 0);
@@ -1098,6 +1141,7 @@ export default function App() {
           onUpdateItemStatus={handleUpdateItemStatus}
           onResetAuction={handleResetAuction}
           onRefreshTeams={syncTeamsFromStorage}
+          onImportTeams={handleImportTeams}
           isDarkMode={isDarkMode}
         />
       )}
