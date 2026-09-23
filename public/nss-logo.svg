@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Path for top Devanagari text -->
+    <path id="topTextArc" d="M 60,250 A 190,190 0 1,1 440,250" fill="none" />
+    <!-- Path for bottom English text -->
+    <path id="bottomTextArc" d="M 440,250 A 190,190 0 0,1 60,250" fill="none" />
+  </defs>
+
+  <!-- Outer Deep Blue Ring -->
+  <circle cx="250" cy="250" r="246" fill="#243385" stroke="#1c286a" stroke-width="4" />
+
+  <!-- White Text Around Ring -->
+  <!-- Top: "राष्ट्रीय सेवा योजना" -->
+  <text fill="#ffffff" font-family="'Plus Jakarta Sans', 'Noto Sans Devanagari', 'Mukta', 'Arial', sans-serif" font-weight="900" font-size="35" letter-spacing="4">
+    <textPath href="#topTextArc" startOffset="50%" text-anchor="middle">
+      राष्ट्रीय सेवा योजना
+    </textPath>
+  </text>
+
+  <!-- Bottom: "NATIONAL SERVICE SCHEME" -->
+  <text fill="#ffffff" font-family="'Chakra Petch', 'Plus Jakarta Sans', 'Arial Black', sans-serif" font-weight="900" font-size="28" letter-spacing="3">
+    <textPath href="#bottomTextArc" startOffset="50%" text-anchor="middle">
+      NATIONAL SERVICE SCHEME
+    </textPath>
+  </text>
+
+  <!-- White Separator Ring -->
+  <circle cx="250" cy="250" r="148" fill="#ffffff" />
+
+  <!-- Inner Red Disc -->
+  <circle cx="250" cy="250" r="142" fill="#D91B24" />
+
+  <!-- Konark Wheel (Rath Wheel) in Pure White -->
+  <!-- Outer Wheel Rim Ring -->
+  <circle cx="250" cy="250" r="136" fill="none" stroke="#ffffff" stroke-width="7" />
+
+  <!-- 8 Main Spokes with Central Pearls/Beads (Rotated every 45 degrees) -->
+  <g transform="translate(250, 250)">
+    <!-- Spoke 0 deg -->
+    <g transform="rotate(0)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 45 deg -->
+    <g transform="rotate(45)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 90 deg -->
+    <g transform="rotate(90)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 135 deg -->
+    <g transform="rotate(135)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 180 deg -->
+    <g transform="rotate(180)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 225 deg -->
+    <g transform="rotate(225)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 270 deg -->
+    <g transform="rotate(270)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+    <!-- Spoke 315 deg -->
+    <g transform="rotate(315)">
+      <line x1="0" y1="-32" x2="0" y2="-133" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+      <circle cx="0" cy="-80" r="13" fill="#ffffff" />
+    </g>
+
+    <!-- 8 Inner hub connection nodes -->
+    <circle cx="0" cy="-32" r="7" fill="#ffffff" />
+    <circle cx="22.6" cy="-22.6" r="7" fill="#ffffff" />
+    <circle cx="32" cy="0" r="7" fill="#ffffff" />
+    <circle cx="22.6" cy="22.6" r="7" fill="#ffffff" />
+    <circle cx="0" cy="32" r="7" fill="#ffffff" />
+    <circle cx="-22.6" cy="22.6" r="7" fill="#ffffff" />
+    <circle cx="-32" cy="0" r="7" fill="#ffffff" />
+    <circle cx="-22.6" cy="-22.6" r="7" fill="#ffffff" />
+
+    <!-- Central Solid White Hub -->
+    <circle cx="0" cy="0" r="28" fill="#ffffff" />
+  </g>
+</svg>

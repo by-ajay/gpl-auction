@@ -1,0 +1,8 @@
+{
+  "name": "Remix Green Premier League",
+  "description": "An interactive, strategy-driven auction experience where student teams compete to build a sustainable and balanced society.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

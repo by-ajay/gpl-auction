@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Chakra Petch", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "Space Mono", monospace;
+  --color-blueprint: #10b981;
+  --color-emerald-accent: #10b981;
+  --color-eco-forest: #04130d;
+  --color-eco-moss: #082317;
+  --color-eco-leaf: #34d399;
+}
+
+/* Custom environmental eco grid patterns */
+.dark .bg-blueprint-grid {
+  background-size: 36px 36px, 36px 36px, 12px 12px, 12px 12px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+    linear-gradient(to right, rgba(52, 211, 153, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(52, 211, 153, 0.03) 1px, transparent 1px);
+}
+
+.light .bg-blueprint-grid {
+  background-size: 36px 36px, 36px 36px, 12px 12px, 12px 12px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.12) 1px, transparent 1px),
+    linear-gradient(to right, rgba(6, 78, 59, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 78, 59, 0.03) 1px, transparent 1px);
+}
+
+.dark .bg-blueprint-fine {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(52, 211, 153, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(52, 211, 153, 0.06) 1px, transparent 1px);
+}
+
+.light .bg-blueprint-fine {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.08) 1px, transparent 1px);
+}
+
+/* Smooth, minimal, functional button standard */
+button, [role="button"] {
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active, [role="button"]:active {
+  transform: scale(0.98);
+}
+
+/* Subtle leaf ambient animation */
+@keyframes leafFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+
+.animate-leaf-float {
+  animation: leafFloat 5s ease-in-out infinite;
+}
+
+/* Technical glow and blueprint corner brackets */
+.corner-brackets {
+  position: relative;
+}
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+.corner-brackets::before {
+  top: 0;
+  left: 0;
+  border-top: 2px solid rgba(16, 185, 129, 0.6);
+  border-left: 2px solid rgba(16, 185, 129, 0.6);
+}
+.corner-brackets::after {
+  bottom: 0;
+  right: 0;
+  border-bottom: 2px solid rgba(16, 185, 129, 0.6);
+  border-right: 2px solid rgba(16, 185, 129, 0.6);
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.03); }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 4s ease-in-out infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+.animate-scanline {
+  animation: scanline 8s linear infinite;
+}
