@@ -129,6 +129,24 @@ export default async function handler(req: any, res: any) {
     }
 
     let teams = loadTeams();
+
+    // Enforce unique email: reject if another team already registered under this email
+    const normalizedEmail = newTeam.leaderEmail?.trim().toLowerCase();
+    if (normalizedEmail) {
+      const emailConflict = teams.find(
+        (t) =>
+          t.id !== newTeam.id &&
+          t.leaderEmail &&
+          t.leaderEmail.trim().toLowerCase() === normalizedEmail
+      );
+      if (emailConflict) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({
+          error: `A team is already registered under ${newTeam.leaderEmail}. Two teams cannot be created under one email address.`,
+        });
+      }
+    }
+
     const existingIndex = teams.findIndex(
       (t) =>
         t.id === newTeam.id ||

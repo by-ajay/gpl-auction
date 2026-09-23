@@ -7,6 +7,7 @@ interface RegistrationModalProps {
   onClose: () => void;
   onRegisterSuccess: (newTeam: RegisteredTeam, session: UserSession) => void;
   onSwitchToLogin?: () => void;
+  registeredTeams?: RegisteredTeam[];
   overallBudget?: number;
   isDarkMode: boolean;
 }
@@ -16,6 +17,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   onClose,
   onRegisterSuccess,
   onSwitchToLogin,
+  registeredTeams = [],
   overallBudget = 1000000,
   isDarkMode,
 }) => {
@@ -52,7 +54,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     setMemberNames(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!teamName.trim()) {
@@ -68,6 +70,36 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
     if (!leaderEmail.trim() || !leaderEmail.includes('@')) {
       setErrorMsg('Please enter a valid leader email address.');
+      return;
+    }
+
+    // Strict validation: No two teams under one email address
+    const normalizedEmail = leaderEmail.trim().toLowerCase();
+    
+    // Check against current memory prop
+    let isEmailDuplicate = registeredTeams.some(
+      (t) => t.leaderEmail && t.leaderEmail.trim().toLowerCase() === normalizedEmail
+    );
+
+    // Also double check against localStorage
+    if (!isEmailDuplicate) {
+      try {
+        const saved = localStorage.getItem('suc_registered_teams');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            isEmailDuplicate = parsed.some(
+              (t: RegisteredTeam) => t.leaderEmail && t.leaderEmail.trim().toLowerCase() === normalizedEmail
+            );
+          }
+        }
+      } catch {}
+    }
+
+    if (isEmailDuplicate) {
+      setErrorMsg(
+        `A team is already registered with this email address (${leaderEmail.trim()}). Two teams cannot be created under one email address.`
+      );
       return;
     }
 
@@ -99,7 +131,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       teamName: teamName.trim(),
       collegeOrDept: collegeOrDept.trim() || 'College / Department',
       memberNames: filledMembers,
-      leaderEmail: leaderEmail.trim().toLowerCase(),
+      leaderEmail: normalizedEmail,
       leaderPhone: leaderPhone.trim(),
       password: password,
       registeredAt: nowStr,
@@ -108,6 +140,25 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       fictionalBudget: overallBudget,
       draftedResourceIds: [],
     };
+
+    // Attempt to register on server first to guarantee uniqueness
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTeam),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        if (errorData?.error) {
+          setErrorMsg(errorData.error);
+          return;
+        }
+      }
+    } catch {
+      // In offline mode continue to client persistence
+    }
 
     setRegisteredSuccessTeam(newTeam);
     setErrorMsg('');
@@ -354,19 +405,43 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               {/* Contact */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-mono text-slate-400 uppercase block mb-1">
-                    Leader Email *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-mono text-slate-400 uppercase block">
+                      Leader Email *
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      1 Email = 1 Team Only
+                    </span>
+                  </div>
                   <input
                     type="email"
                     required
                     placeholder="leader@college.edu"
                     value={leaderEmail}
-                    onChange={(e) => setLeaderEmail(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-emerald-400 ${
-                      isDarkMode ? 'bg-[#02180e] border-emerald-900 text-white' : 'bg-white border-emerald-300'
+                    onChange={(e) => {
+                      setLeaderEmail(e.target.value);
+                      if (errorMsg) setErrorMsg('');
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none ${
+                      leaderEmail.trim() &&
+                      registeredTeams.some(
+                        (t) => t.leaderEmail && t.leaderEmail.trim().toLowerCase() === leaderEmail.trim().toLowerCase()
+                      )
+                        ? 'border-red-500 text-red-300 focus:border-red-500'
+                        : isDarkMode
+                        ? 'bg-[#02180e] border-emerald-900 text-white focus:border-emerald-400'
+                        : 'bg-white border-emerald-300 focus:border-emerald-400'
                     }`}
                   />
+                  {leaderEmail.trim() &&
+                    registeredTeams.some(
+                      (t) => t.leaderEmail && t.leaderEmail.trim().toLowerCase() === leaderEmail.trim().toLowerCase()
+                    ) && (
+                      <p className="text-[10px] font-mono text-red-400 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                        <span>This email is already registered to a team. Duplicate not allowed.</span>
+                      </p>
+                    )}
                 </div>
                 <div>
                   <label className="text-xs font-mono text-slate-400 uppercase block mb-1">

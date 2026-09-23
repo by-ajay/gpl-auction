@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AuctionItem, UserSession } from '../types';
+import { AuctionItem, UserSession, RegisteredTeam } from '../types';
 import { EVENT_DETAILS, getItemBudgetPercentage } from '../data/eventData';
 import { ResourceDetailModal } from './ResourceDetailModal';
 import {
@@ -176,19 +176,24 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 interface AuctionSectionProps {
   auctionItems: AuctionItem[];
-  draftedItemIds: string[];
-  onToggleDraft: (item: AuctionItem) => void;
-  onResetDraft: () => void;
+  draftedItemIds?: string[];
+  onToggleDraft?: (item: AuctionItem) => void;
+  onResetDraft?: () => void;
   isDarkMode: boolean;
   currentUserTeamName?: string;
   overallBudget?: number;
   userSession?: UserSession;
   onUpdateItemStartingPrice?: (itemId: string, newPrice: number) => void;
+  registeredTeams?: RegisteredTeam[];
+  onAssignResource?: (itemId: string, teamName: string, price: number) => void;
+  onUnassignResource?: (itemId: string) => void;
+  activeLiveBidItemId?: string;
+  onNavigateToLiveArena?: () => void;
 }
 
 export const AuctionSection: React.FC<AuctionSectionProps> = ({
   auctionItems,
-  draftedItemIds,
+  draftedItemIds = [],
   onToggleDraft,
   onResetDraft,
   isDarkMode,
@@ -196,6 +201,11 @@ export const AuctionSection: React.FC<AuctionSectionProps> = ({
   overallBudget,
   userSession,
   onUpdateItemStartingPrice,
+  registeredTeams = [],
+  onAssignResource,
+  onUnassignResource,
+  activeLiveBidItemId,
+  onNavigateToLiveArena,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -668,28 +678,35 @@ export const AuctionSection: React.FC<AuctionSectionProps> = ({
                         <span>EXCLUSIVE</span>
                       </span>
                     )
+                  ) : item.id === activeLiveBidItemId ? (
+                    <button
+                      type="button"
+                      onClick={onNavigateToLiveArena}
+                      className="py-2 px-3 rounded-lg text-xs font-['Space_Mono'] uppercase font-bold flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse cursor-pointer transition-all"
+                      title="This resource is currently open for live bids! Enter Arena now."
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                      <span>BID LIVE</span>
+                    </button>
+                  ) : isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalItem(item)}
+                      className="py-2 px-3 rounded-lg text-xs font-['Space_Mono'] uppercase font-bold flex items-center justify-center gap-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 cursor-pointer transition-all"
+                      title="Admin access: assign this resource or modify valuation"
+                    >
+                      <Gavel className="w-3 h-3 text-emerald-400" />
+                      <span>ASSIGN</span>
+                    </button>
                   ) : (
                     <button
                       type="button"
-                      id={`draft-toggle-${item.id}`}
-                      onClick={() => onToggleDraft(item)}
-                      className={`py-2 px-3 rounded-lg text-xs font-['Space_Mono'] uppercase font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                        isDrafted
-                          ? 'bg-cyan-600/30 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/50'
-                          : canAfford
-                          ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50'
-                          : 'opacity-40 cursor-not-allowed border border-slate-700'
-                      }`}
-                      title={isDrafted ? 'Remove from trial sandbox' : 'Add to trial sandbox'}
+                      onClick={() => setActiveModalItem(item)}
+                      className="py-2 px-3 rounded-lg text-xs font-['Space_Mono'] uppercase font-medium flex items-center justify-center gap-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-all"
+                      title="Inspect resource specifications, impacts and metrics"
                     >
-                      {isDrafted ? (
-                        <span>REMOVE</span>
-                      ) : (
-                        <>
-                          <Plus className="w-3 h-3" />
-                          <span>TRIAL ADD</span>
-                        </>
-                      )}
+                      <Info className="w-3 h-3 text-emerald-400" />
+                      <span>SPECS</span>
                     </button>
                   )}
                 </div>
@@ -704,11 +721,11 @@ export const AuctionSection: React.FC<AuctionSectionProps> = ({
         <ResourceDetailModal
           item={activeModalItem}
           onClose={() => setActiveModalItem(null)}
-          onSimulateBid={!isAdmin ? onToggleDraft : undefined}
-          isDrafted={draftedItemIds.includes(activeModalItem.id)}
-          canAfford={simulatedRemaining >= activeModalItem.startingPrice || draftedItemIds.includes(activeModalItem.id)}
           isDarkMode={isDarkMode}
           isAdmin={isAdmin}
+          registeredTeams={registeredTeams}
+          onAssignResource={onAssignResource}
+          onUnassignResource={onUnassignResource}
           onUpdateStartingPrice={onUpdateItemStartingPrice}
         />
       )}

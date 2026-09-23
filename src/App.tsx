@@ -286,6 +286,70 @@ export default function App() {
     }
   }, [activeLiveBid]);
 
+  // Real-time synchronization with server /api/live-bid and BroadcastChannel across tabs/devices
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLiveBidState = async () => {
+      try {
+        const res = await fetch('/api/live-bid');
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data) {
+            if (data.activeBid !== undefined) {
+              setActiveLiveBid((current) => {
+                if (!data.activeBid) return null;
+                if (!current) return data.activeBid;
+                // If server bid has higher amount, changed bidder, or different status/item, sync
+                if (
+                  data.activeBid.currentBid !== current.currentBid ||
+                  data.activeBid.currentBidderTeam !== current.currentBidderTeam ||
+                  data.activeBid.status !== current.status ||
+                  data.activeBid.itemId !== current.itemId
+                ) {
+                  return data.activeBid;
+                }
+                return current;
+              });
+            }
+            if (Array.isArray(data.auctionItems) && data.auctionItems.length > 0) {
+              setAuctionItems((prev) => {
+                const hasDifferences = data.auctionItems.some((serverItem: AuctionItem) => {
+                  const local = prev.find((i) => i.id === serverItem.id);
+                  return !local || local.status !== serverItem.status || local.soldToTeam !== serverItem.soldToTeam;
+                });
+                return hasDifferences ? data.auctionItems : prev;
+              });
+            }
+          }
+        }
+      } catch {
+        // network resilient
+      }
+    };
+
+    fetchLiveBidState();
+    const pollInterval = setInterval(fetchLiveBidState, 1500);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'LIVE_BID_UPDATED') {
+            fetchLiveBidState();
+          }
+        };
+      } catch {}
+    }
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+      if (bc) bc.close();
+    };
+  }, []);
+
   // Live Timer Countdown Effect for Real-Time Bidding Arena
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -354,6 +418,16 @@ export default function App() {
   };
 
   const handleRegisterTeam = async (newTeam: RegisteredTeam, session?: UserSession) => {
+    // Check if another team already exists with this leader email
+    const emailToCheck = newTeam.leaderEmail.trim().toLowerCase();
+    const existingWithSameEmail = registeredTeams.find(
+      (t) => t.id !== newTeam.id && t.leaderEmail.trim().toLowerCase() === emailToCheck
+    );
+    if (existingWithSameEmail) {
+      alert(`A team ("${existingWithSameEmail.teamName}") is already registered under the email address ${newTeam.leaderEmail}. Two teams cannot be registered under one email address.`);
+      return;
+    }
+
     // Registered teams strictly possess participant role (no admin perms)
     const cleanTeam: RegisteredTeam = {
       ...newTeam,
@@ -534,6 +608,21 @@ export default function App() {
     };
 
     setActiveLiveBid(newBidSession);
+
+    // Sync with backend API
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start_bid', session: newBidSession }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
   };
 
   // Place a bid during live auction with anti-spam cooldown protection
@@ -602,6 +691,21 @@ export default function App() {
       };
     });
 
+    // Notify backend
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'place_bid', teamName, amount }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
+
     return { success: true };
   };
 
@@ -615,6 +719,20 @@ export default function App() {
       }
       return prev;
     });
+
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'pause_resume' }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
   };
 
   const handleAddSeconds = (seconds: number) => {
@@ -626,6 +744,20 @@ export default function App() {
         totalDurationSeconds: prev.totalDurationSeconds + seconds,
       };
     });
+
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add_seconds', seconds }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
   };
 
   const handleEndBid = (declareWinner: boolean = true) => {
@@ -655,10 +787,38 @@ export default function App() {
           : null
       );
     }
+
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'end_bid', declareWinner }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
   };
 
   const handleResetBid = () => {
     setActiveLiveBid(null);
+
+    fetch('/api/live-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset_bid' }),
+    }).catch(() => {});
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
+    }
   };
 
   // Admin action: update overall auction budget
@@ -684,7 +844,7 @@ export default function App() {
     );
   };
 
-  // Admin action: update item sold status manually
+  // Admin action: update item sold status manually (Assign or Revoke resource)
   const handleUpdateItemStatus = (itemId: string, status: 'available' | 'sold', teamName?: string, price?: number) => {
     setAuctionItems((prev) =>
       prev.map((item) =>
@@ -709,6 +869,36 @@ export default function App() {
           return t;
         })
       );
+
+      // Persist to server
+      fetch('/api/live-bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'assign_resource', itemId, teamName, price }),
+      }).catch(() => {});
+    } else if (status === 'available') {
+      // Remove from any team that previously held it
+      setRegisteredTeams((prev) =>
+        prev.map((t) => ({
+          ...t,
+          draftedResourceIds: (t.draftedResourceIds || []).filter((id) => id !== itemId),
+        }))
+      );
+
+      // Persist unassign to server
+      fetch('/api/live-bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unassign_resource', itemId }),
+      }).catch(() => {});
+    }
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('suc_live_bid_channel');
+        bc.postMessage({ type: 'LIVE_BID_UPDATED' });
+        bc.close();
+      } catch {}
     }
   };
 
@@ -801,8 +991,43 @@ export default function App() {
         isLiveBidActive={Boolean(activeLiveBid && activeLiveBid.status === 'bidding')}
       />
 
+      {/* Site-wide Live Bid Alert Banner: Updates instantly for all teams when a bid has started */}
+      {activeLiveBid && activeLiveBid.status === 'bidding' && (
+        <aside
+          aria-label="Active Live Bidding Notification"
+          className="fixed top-[58px] left-0 right-0 z-40 bg-gradient-to-r from-red-600 via-emerald-700 to-red-600 text-white shadow-xl py-2 px-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/20 animate-fadeIn"
+        >
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="flex h-3 w-3 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            </span>
+            <span className="text-xs font-['Chakra_Petch'] font-black uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded text-yellow-300">
+              ROUND ACTIVE NOW
+            </span>
+            <span className="text-xs font-bold font-mono text-white">
+              {activeLiveBid.itemName}
+            </span>
+            <span className="text-xs font-mono text-emerald-100 hidden sm:inline">
+              • High Bid: <strong className="text-yellow-300">₹{activeLiveBid.currentBid.toLocaleString()}</strong> ({activeLiveBid.currentBidderTeam || 'Opening Floor'})
+            </span>
+            <span className="text-xs font-mono font-bold bg-black/50 px-2 py-0.5 rounded text-yellow-300">
+              ⏱ {Math.floor(activeLiveBid.remainingSeconds / 60)}:{(activeLiveBid.remainingSeconds % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSelectTab('live-bid')}
+            className="px-4 py-1 rounded-md bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-['Chakra_Petch'] font-bold text-xs uppercase tracking-wider shadow cursor-pointer transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <span>BID IN ARENA</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </aside>
+      )}
+
       {/* Main Content: Switches to the selected section based on user navigation */}
-      <main className="min-h-[calc(100vh-200px)]">
+      <main className={`min-h-[calc(100vh-200px)] ${activeLiveBid && activeLiveBid.status === 'bidding' ? 'pt-8' : ''}`}>
         {activeTab === 'home' && (
           <div>
             <Hero
@@ -1021,6 +1246,11 @@ export default function App() {
                 overallBudget={overallBudget}
                 userSession={userSession}
                 onUpdateItemStartingPrice={handleUpdateResourceStartingPrice}
+                registeredTeams={registeredTeams}
+                onAssignResource={(itemId, teamName, price) => handleUpdateItemStatus(itemId, 'sold', teamName, price)}
+                onUnassignResource={(itemId) => handleUpdateItemStatus(itemId, 'available')}
+                activeLiveBidItemId={activeLiveBid && activeLiveBid.status === 'bidding' ? activeLiveBid.itemId : undefined}
+                onNavigateToLiveArena={() => handleSelectTab('live-bid')}
               />
             ) : (
               <LockedAuctionTeaser

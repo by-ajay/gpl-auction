@@ -76,13 +76,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemPrice, setEditingItemPrice] = useState<number>(0);
   const [resourceSavedNotice, setResourceSavedNotice] = useState<string | null>(null);
+  const [assignNotice, setAssignNotice] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleMarkSold = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemForSale || !soldTeam) return;
+    const targetItem = auctionItems.find((i) => i.id === selectedItemForSale);
     onUpdateItemStatus(selectedItemForSale, 'sold', soldTeam, Number(soldPrice));
+    setAssignNotice(`Successfully assigned "${targetItem?.name || 'Resource'}" to team "${soldTeam}" at ₹${Number(soldPrice).toLocaleString()}!`);
+    setTimeout(() => setAssignNotice(null), 3000);
     setSelectedItemForSale('');
     setSoldTeam('');
   };
@@ -251,7 +255,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   : 'bg-emerald-950/50 text-slate-300 hover:text-white border border-emerald-900'
               }`}
             >
-              Sales Floor ({soldCount}/{auctionItems.length})
+              Assign Resources ({soldCount}/{auctionItems.length})
             </button>
           </div>
         </div>
@@ -680,6 +684,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* Tab 4: Inventory & Sale Management */}
         {activeTab === 'auction' && (
           <div className="pt-6 space-y-6">
+            {assignNotice && (
+              <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-mono flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{assignNotice}</span>
+              </div>
+            )}
+
             {/* Record Winning Hammer Form */}
             <form
               onSubmit={handleMarkSold}
@@ -687,12 +698,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 isDarkMode ? 'bg-[#02180e] border-emerald-900' : 'bg-emerald-50/50 border-emerald-300'
               }`}
             >
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <Gavel className="w-4 h-4 text-emerald-400" />
                 <span className="font-['Chakra_Petch'] font-bold text-sm uppercase text-white">
-                  RECORD EXCLUSIVE RESOURCE SALE (HAMMER DOWN)
+                  ASSIGN RESOURCE TO TEAM (ADMIN EXCLUSIVE)
                 </span>
               </div>
+              <p className="text-xs font-mono text-slate-400 mb-4">
+                Assigning a resource is an admin-exclusive capability. Once assigned, the resource is transferred to the team's portfolio and marked exclusive across the platform.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                 <div>
@@ -704,7 +718,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => {
                       setSelectedItemForSale(e.target.value);
                       const it = auctionItems.find((i) => i.id === e.target.value);
-                      if (it) setSoldPrice(it.startingPrice);
+                      if (it) setSoldPrice(it.soldPrice || it.startingPrice);
                     }}
                     className={`w-full px-3 py-2 rounded-lg border text-xs font-mono outline-none cursor-pointer ${
                       isDarkMode ? 'bg-[#031d12] border-emerald-800 text-white' : 'bg-white border-emerald-300 text-slate-900'
@@ -713,7 +727,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <option value="">-- Choose from 28 Items --</option>
                     {auctionItems.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.name} {item.status === 'sold' ? `(SOLD to ${item.soldToTeam})` : `(Base: ₹${item.startingPrice.toLocaleString()})`}
+                        {item.name} {item.status === 'sold' ? `(Assigned to ${item.soldToTeam})` : `(Base: ₹${item.startingPrice.toLocaleString()})`}
                       </option>
                     ))}
                   </select>
@@ -721,7 +735,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1">
-                    Winning Team Name
+                    Target Team Name
                   </label>
                   {registeredTeams.length > 0 ? (
                     <select
@@ -734,7 +748,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <option value="">-- Select Registered Team --</option>
                       {registeredTeams.map((t) => (
                         <option key={t.id} value={t.teamName}>
-                          {t.teamName}
+                          {t.teamName} ({t.leaderEmail})
                         </option>
                       ))}
                     </select>
@@ -753,7 +767,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1">
-                    Winning Bid Amount (₹)
+                    Assignment Value (₹)
                   </label>
                   <input
                     type="number"
@@ -770,17 +784,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono text-slate-400">
-                  Resource exclusivity: Each resource can strictly only be bought by one team.
+                  Resource exclusivity: Each resource can strictly only be assigned to one team.
                 </span>
                 <button
                   type="submit"
                   disabled={!selectedItemForSale || !soldTeam}
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-['Chakra_Petch'] font-bold text-xs uppercase disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-['Chakra_Petch'] font-bold text-xs uppercase disabled:opacity-50 cursor-pointer transition-colors flex items-center gap-1.5"
                 >
-                  CONFIRM EXCLUSIVE SALE
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>ASSIGN RESOURCE TO TEAM</span>
                 </button>
               </div>
             </form>
+
+            {/* Currently Assigned Resources Table */}
+            {auctionItems.filter((i) => i.status === 'sold').length > 0 && (
+              <div className="space-y-3">
+                <h4 className="font-['Chakra_Petch'] font-bold text-sm uppercase text-emerald-400 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    CURRENTLY ASSIGNED RESOURCES ({auctionItems.filter((i) => i.status === 'sold').length})
+                  </span>
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {auctionItems
+                    .filter((i) => i.status === 'sold')
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-xl border border-cyan-500/40 bg-cyan-950/20 flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-white">{item.name}</span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-mono text-slate-400 mt-1">
+                            Assigned to: <strong className="text-emerald-400">{item.soldToTeam}</strong> • ₹{item.soldPrice?.toLocaleString()}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onUpdateItemStatus(item.id, 'available');
+                            setAssignNotice(`Revoked assignment of "${item.name}". Item is now available again.`);
+                            setTimeout(() => setAssignNotice(null), 3000);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[11px] font-mono font-bold cursor-pointer transition-colors shrink-0"
+                          title="Revoke resource assignment and restore to inventory"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Inventory Status Grid */}
             <div className="space-y-3">

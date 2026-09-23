@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuctionItem } from '../types';
+import { AuctionItem, RegisteredTeam } from '../types';
 import { getItemBudgetPercentage } from '../data/eventData';
 import {
   X,
@@ -16,6 +16,7 @@ import {
   Layers,
   AlertTriangle,
   CheckCircle,
+  CheckCircle2,
   Tag,
   Info,
   Sun,
@@ -92,11 +93,11 @@ import {
 interface ResourceDetailModalProps {
   item: AuctionItem | null;
   onClose: () => void;
-  onSimulateBid?: (item: AuctionItem) => void;
-  isDrafted?: boolean;
-  canAfford?: boolean;
   isDarkMode?: boolean;
   isAdmin?: boolean;
+  registeredTeams?: RegisteredTeam[];
+  onAssignResource?: (itemId: string, teamName: string, price: number) => void;
+  onUnassignResource?: (itemId: string) => void;
   onUpdateStartingPrice?: (itemId: string, newPrice: number) => void;
 }
 
@@ -183,25 +184,51 @@ const iconComponentMap: Record<string, React.ComponentType<{ className?: string 
 export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
   item,
   onClose,
-  onSimulateBid,
-  isDrafted,
-  canAfford,
   isDarkMode = true,
   isAdmin = false,
+  registeredTeams = [],
+  onAssignResource,
+  onUnassignResource,
   onUpdateStartingPrice,
 }) => {
   const [priceInput, setPriceInput] = useState<number>(item?.startingPrice || 100000);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [selectedTeamForAssign, setSelectedTeamForAssign] = useState<string>(
+    registeredTeams[0]?.teamName || ''
+  );
+  const [assignPrice, setAssignPrice] = useState<number>(item?.startingPrice || 100000);
+  const [assignSuccessNotice, setAssignSuccessNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (item) {
       setPriceInput(item.startingPrice);
+      setAssignPrice(item.soldPrice || item.startingPrice);
     }
   }, [item]);
+
+  useEffect(() => {
+    if (!selectedTeamForAssign && registeredTeams.length > 0) {
+      setSelectedTeamForAssign(registeredTeams[0].teamName);
+    }
+  }, [registeredTeams, selectedTeamForAssign]);
 
   if (!item) return null;
 
   const Icon = iconComponentMap[item.iconName] || Layers;
+
+  const handleAssignClick = () => {
+    if (!selectedTeamForAssign || !onAssignResource) return;
+    onAssignResource(item.id, selectedTeamForAssign, Number(assignPrice));
+    setAssignSuccessNotice(`Resource assigned to ${selectedTeamForAssign}!`);
+    setTimeout(() => setAssignSuccessNotice(null), 2500);
+  };
+
+  const handleUnassignClick = () => {
+    if (!onUnassignResource) return;
+    onUnassignResource(item.id);
+    setAssignSuccessNotice('Resource unassigned and restored to available inventory.');
+    setTimeout(() => setAssignSuccessNotice(null), 2500);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto">
@@ -327,10 +354,108 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Admin Exclusive Resource Assignment & Budget Controls */}
+        {isAdmin && (
+          <div className="mb-6 p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/25">
+            <div className="flex items-center gap-2 mb-3">
+              <Gavel className="w-4 h-4 text-emerald-400" />
+              <span className="font-['Chakra_Petch'] font-bold text-xs uppercase tracking-wider text-emerald-300">
+                ADMIN RESOURCE ASSIGNMENT CONTROLS
+              </span>
+            </div>
+
+            {assignSuccessNotice && (
+              <div className="mb-3 p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>{assignSuccessNotice}</span>
+              </div>
+            )}
+
+            {item.status === 'sold' ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg bg-[#02140b] border border-emerald-800">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-400 block">CURRENT ASSIGNMENT:</span>
+                  <p className="text-sm font-['Chakra_Petch'] font-bold text-white">
+                    Assigned to <span className="text-emerald-400">{item.soldToTeam}</span> at ₹{item.soldPrice?.toLocaleString()}
+                  </p>
+                </div>
+                {onUnassignResource && (
+                  <button
+                    type="button"
+                    onClick={handleUnassignClick}
+                    className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-mono font-bold cursor-pointer transition-colors"
+                  >
+                    REVOKE / UNASSIGN
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <span className="text-[11px] font-mono text-slate-400 block">
+                  Directly assign this asset to any registered team (strictly restricted to administrators):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                      Target Registered Team:
+                    </label>
+                    <select
+                      value={selectedTeamForAssign}
+                      onChange={(e) => setSelectedTeamForAssign(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg text-xs font-mono border focus:outline-none cursor-pointer ${
+                        isDarkMode ? 'bg-[#02180e] border-emerald-800 text-white' : 'bg-white border-emerald-300 text-slate-900'
+                      }`}
+                    >
+                      {registeredTeams.map((t) => (
+                        <option key={t.id} value={t.teamName}>
+                          {t.teamName} ({t.leaderEmail})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                      Assigned Price (₹):
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={assignPrice || ''}
+                      onChange={(e) => setAssignPrice(Number(e.target.value))}
+                      className={`w-full px-3 py-2 rounded-lg text-xs font-mono border focus:outline-none ${
+                        isDarkMode ? 'bg-[#02180e] border-emerald-800 text-white' : 'bg-white border-emerald-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAssignClick}
+                    disabled={!selectedTeamForAssign}
+                    className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-['Chakra_Petch'] font-bold text-xs uppercase cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Gavel className="w-3.5 h-3.5" />
+                    <span>ASSIGN RESOURCE TO TEAM</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Action Footer */}
         <div className="pt-4 border-t border-emerald-950/60 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs font-mono text-slate-400 text-center sm:text-left">
-            <span>Exclusive resource subject to official auction bidding.</span>
+            {item.status === 'sold' ? (
+              <span className="text-cyan-400 font-bold">
+                Exclusively acquired by {item.soldToTeam}.
+              </span>
+            ) : (
+              <span>Exclusive resource subject to official admin assignment or live auction floor.</span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
@@ -346,8 +471,8 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
               CLOSE
             </button>
 
-            {/* Admin can edit the budget of the resource, but cannot add resources to their own team */}
-            {isAdmin && onUpdateStartingPrice ? (
+            {/* Admin can edit the budget of the resource */}
+            {isAdmin && onUpdateStartingPrice && (
               <div className="flex items-center gap-2">
                 <div className={`flex items-center gap-1 border rounded-lg px-2.5 py-1.5 ${
                   isDarkMode ? 'bg-[#020b06] border-emerald-900/60' : 'bg-white border-emerald-200'
@@ -378,31 +503,7 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
                   <span>{savedSuccess ? 'SAVED' : 'SAVE BUDGET'}</span>
                 </button>
               </div>
-            ) : onSimulateBid ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onSimulateBid(item);
-                  onClose();
-                }}
-                className={`px-5 py-2 rounded-lg text-xs font-['Chakra_Petch'] font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  isDrafted
-                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                    : canAfford
-                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                {isDrafted ? (
-                  <span>REMOVE RESOURCE</span>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>ADD RESOURCE</span>
-                  </>
-                )}
-              </button>
-            ) : null}
+            )}
           </div>
         </div>
       </div>

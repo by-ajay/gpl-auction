@@ -61,6 +61,23 @@ async function start() {
     }
 
     inMemoryTeams = loadTeams();
+
+    // Check duplicate email address (strictly one team per email)
+    const normalizedEmail = newTeam.leaderEmail?.trim().toLowerCase();
+    if (normalizedEmail) {
+      const emailConflict = inMemoryTeams.find(
+        (t) =>
+          t.id !== newTeam.id &&
+          t.leaderEmail &&
+          t.leaderEmail.trim().toLowerCase() === normalizedEmail
+      );
+      if (emailConflict) {
+        return res.status(400).json({
+          error: `A team is already registered under ${newTeam.leaderEmail}. Two teams cannot be created under one email address.`,
+        });
+      }
+    }
+
     // Check if team already exists by ID or team name (case-insensitive)
     const existingIndex = inMemoryTeams.findIndex(
       (t) =>
@@ -118,6 +135,157 @@ async function start() {
       saveTeams(inMemoryTeams);
     }
     res.json({ success: true, teams: inMemoryTeams });
+  });
+
+  // In-memory live bid session and auction items cache
+  let inMemoryLiveBid: any = null;
+  let inMemoryAuctionItems: any[] = [];
+
+  // API Route: Get live bid status and items
+  app.get('/api/live-bid', (_req, res) => {
+    res.json({
+      activeBid: inMemoryLiveBid,
+      auctionItems: inMemoryAuctionItems,
+      serverTime: Date.now(),
+    });
+  });
+
+  // API Route: Live bidding actions & resource assignments
+  app.post('/api/live-bid', (req, res) => {
+    const { action, session, items, teamName, amount, seconds, declareWinner, itemId, price } = req.body;
+
+    if (action === 'start_bid') {
+      inMemoryLiveBid = session;
+      if (Array.isArray(items)) {
+        inMemoryAuctionItems = items;
+      }
+      return res.json({ success: true, activeBid: inMemoryLiveBid, auctionItems: inMemoryAuctionItems });
+    }
+
+    if (action === 'place_bid') {
+      if (!inMemoryLiveBid || inMemoryLiveBid.status !== 'bidding') {
+        return res.status(400).json({ error: 'No active bidding session in progress.' });
+      }
+
+      if (amount <= inMemoryLiveBid.currentBid) {
+        return res.status(400).json({
+          error: `Bid must be higher than current highest bid of ₹${inMemoryLiveBid.currentBid.toLocaleString()}.`,
+        });
+      }
+
+      const extension = inMemoryLiveBid.remainingSeconds < 15 ? 10 : 0;
+      const newLog = {
+        id: `bid-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        teamName,
+        amount,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+      };
+
+      inMemoryLiveBid.currentBid = amount;
+      inMemoryLiveBid.currentBidderTeam = teamName;
+      inMemoryLiveBid.remainingSeconds += extension;
+      inMemoryLiveBid.totalDurationSeconds += extension;
+      inMemoryLiveBid.bidsHistory = [newLog, ...(inMemoryLiveBid.bidsHistory || [])];
+
+      return res.json({ success: true, activeBid: inMemoryLiveBid });
+    }
+
+    if (action === 'pause_resume') {
+      if (inMemoryLiveBid) {
+        if (inMemoryLiveBid.status === 'bidding') {
+          inMemoryLiveBid.status = 'paused';
+          inMemoryLiveBid.isRunning = false;
+        } else if (inMemoryLiveBid.status === 'paused') {
+          inMemoryLiveBid.status = 'bidding';
+          inMemoryLiveBid.isRunning = true;
+        }
+      }
+      return res.json({ success: true, activeBid: inMemoryLiveBid });
+    }
+
+    if (action === 'add_seconds') {
+      const sec = Number(seconds) || 15;
+      if (inMemoryLiveBid) {
+        inMemoryLiveBid.remainingSeconds += sec;
+        inMemoryLiveBid.totalDurationSeconds += sec;
+      }
+      return res.json({ success: true, activeBid: inMemoryLiveBid });
+    }
+
+    if (action === 'end_bid') {
+      const isWinner = declareWinner !== false;
+      if (inMemoryLiveBid) {
+        inMemoryLiveBid.isRunning = false;
+        if (isWinner && inMemoryLiveBid.currentBidderTeam) {
+          inMemoryLiveBid.status = 'sold';
+          if (inMemoryAuctionItems.length > 0) {
+            inMemoryAuctionItems = inMemoryAuctionItems.map((itm) =>
+              itm.id === inMemoryLiveBid.itemId
+                ? {
+                    ...itm,
+                    status: 'sold',
+                    soldToTeam: inMemoryLiveBid.currentBidderTeam,
+                    soldPrice: inMemoryLiveBid.currentBid,
+                  }
+                : itm
+            );
+          }
+        } else {
+          inMemoryLiveBid.status = 'passed';
+        }
+      }
+      return res.json({ success: true, activeBid: inMemoryLiveBid, auctionItems: inMemoryAuctionItems });
+    }
+
+    if (action === 'reset_bid') {
+      inMemoryLiveBid = null;
+      return res.json({ success: true, activeBid: null });
+    }
+
+    if (action === 'sync_items') {
+      if (Array.isArray(items)) {
+        inMemoryAuctionItems = items;
+      }
+      return res.json({ success: true, auctionItems: inMemoryAuctionItems });
+    }
+
+    if (action === 'assign_resource') {
+      if (itemId && teamName) {
+        inMemoryAuctionItems = inMemoryAuctionItems.map((itm) =>
+          itm.id === itemId
+            ? {
+                ...itm,
+                status: 'sold',
+                soldToTeam: teamName,
+                soldPrice: Number(price) || itm.startingPrice,
+              }
+            : itm
+        );
+      }
+      return res.json({ success: true, auctionItems: inMemoryAuctionItems });
+    }
+
+    if (action === 'unassign_resource') {
+      if (itemId) {
+        inMemoryAuctionItems = inMemoryAuctionItems.map((itm) =>
+          itm.id === itemId
+            ? {
+                ...itm,
+                status: 'available',
+                soldToTeam: undefined,
+                soldPrice: undefined,
+              }
+            : itm
+        );
+      }
+      return res.json({ success: true, auctionItems: inMemoryAuctionItems });
+    }
+
+    res.status(400).json({ error: 'Unknown action.' });
   });
 
   // Vite development middlewares or static production serving

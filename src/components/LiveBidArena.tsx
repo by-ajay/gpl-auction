@@ -84,6 +84,9 @@ export const LiveBidArena: React.FC<LiveBidArenaProps> = ({
   const [adminBiddingTeam, setAdminBiddingTeam] = useState<string>(
     registeredTeams[0]?.teamName || ''
   );
+  const [guestBiddingTeam, setGuestBiddingTeam] = useState<string>(
+    registeredTeams[0]?.teamName || ''
+  );
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
   // Sync starting price when selected item changes
@@ -93,12 +96,15 @@ export const LiveBidArena: React.FC<LiveBidArenaProps> = ({
     }
   }, [selectedItemId]);
 
-  // Keep admin bidding team valid
+  // Keep admin and guest bidding team valid
   useEffect(() => {
     if (!adminBiddingTeam && registeredTeams.length > 0) {
       setAdminBiddingTeam(registeredTeams[0].teamName);
     }
-  }, [registeredTeams, adminBiddingTeam]);
+    if (!guestBiddingTeam && registeredTeams.length > 0) {
+      setGuestBiddingTeam(registeredTeams[0].teamName);
+    }
+  }, [registeredTeams, adminBiddingTeam, guestBiddingTeam]);
 
   // Find user's team details if participant
   const userTeam = registeredTeams.find(
@@ -577,17 +583,133 @@ export const LiveBidArena: React.FC<LiveBidArenaProps> = ({
                       </div>
                     )
                   ) : (
-                    <div className="text-center py-3">
-                      <p className="text-xs text-slate-400 font-mono mb-2">
-                        Sign in as a registered team to participate and place bids directly from your device.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={onOpenLogin}
-                        className="px-4 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-mono text-xs font-bold uppercase"
-                      >
-                        Sign In with Team Email
-                      </button>
+                    /* Participant team bidding interface for guests / teams on the floor */
+                    <div className="space-y-4">
+                      {registeredTeams.length > 0 ? (
+                        <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                              <span className="text-xs font-['Chakra_Petch'] font-bold text-emerald-300 uppercase">
+                                TEAM BIDDING CONSOLE (ROUND IN PROGRESS)
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={onOpenLogin}
+                              className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                            >
+                              Or Sign In with Team Password →
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <label className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                                Choose Your Team:
+                              </label>
+                              <select
+                                value={guestBiddingTeam}
+                                onChange={(e) => setGuestBiddingTeam(e.target.value)}
+                                className={`w-full px-3 py-2 rounded-lg text-xs font-mono border focus:outline-none cursor-pointer ${
+                                  isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                                }`}
+                              >
+                                {registeredTeams.map((t) => {
+                                  const bal = getUserTeamRemainingBudget(t);
+                                  return (
+                                    <option key={t.id} value={t.teamName}>
+                                      {t.teamName} (₹{bal.toLocaleString()} available)
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                                Team Treasury Balance:
+                              </label>
+                              <div className="px-3 py-2 rounded-lg bg-black/40 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold">
+                                ₹{getUserTeamRemainingBudget(registeredTeams.find((t) => t.teamName === guestBiddingTeam)).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick increment buttons */}
+                          <div className="mb-3">
+                            <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1.5">
+                              Quick Raise Bids:
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {[2000, 5000, 10000, 25000].map((inc) => {
+                                const targetAmount = activeBid.currentBid + inc;
+                                const bal = getUserTeamRemainingBudget(registeredTeams.find((t) => t.teamName === guestBiddingTeam));
+                                const canAfford = bal >= targetAmount;
+                                return (
+                                  <button
+                                    key={inc}
+                                    type="button"
+                                    onClick={() => handlePlaceBidSubmit(targetAmount, guestBiddingTeam)}
+                                    disabled={cooldownSeconds > 0 || !canAfford}
+                                    className="py-2 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold transition-all disabled:opacity-40 cursor-pointer"
+                                  >
+                                    + ₹{inc.toLocaleString()}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Custom Bid Input */}
+                          <div>
+                            <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1.5">
+                              Custom Bid Amount:
+                            </span>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <span className="absolute left-3 top-2.5 text-xs font-mono text-slate-400">₹</span>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  disabled={cooldownSeconds > 0}
+                                  placeholder={`Min ₹${(activeBid.currentBid + 500).toLocaleString()}`}
+                                  value={bidAmountInput}
+                                  onChange={(e) => setBidAmountInput(e.target.value)}
+                                  className={`w-full pl-7 pr-3 py-2 rounded-lg text-xs font-mono border focus:outline-none focus:border-emerald-500 ${
+                                    isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'
+                                  } disabled:opacity-50`}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                disabled={
+                                  cooldownSeconds > 0 ||
+                                  !bidAmountInput ||
+                                  Number(bidAmountInput) <= activeBid.currentBid
+                                }
+                                onClick={() => handlePlaceBidSubmit(Number(bidAmountInput), guestBiddingTeam)}
+                                className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-['Chakra_Petch'] font-bold text-xs uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer"
+                              >
+                                {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : 'SUBMIT BID'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <p className="text-xs text-slate-400 font-mono mb-3">
+                            No approved teams are currently registered on the roster.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={onOpenRegister}
+                            className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold uppercase transition-colors"
+                          >
+                            Register Your Team Now
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
